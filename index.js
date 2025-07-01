@@ -22,7 +22,7 @@ app.post("/telegram", async (req, res) => {
   if (!threadId) {
     try {
       const thread = await openai.beta.threads.create();
-      console.log("Created new thread:", thread);
+      console.log("Created new thread response:", JSON.stringify(thread, null, 2));
       if (!thread || !thread.id) {
         console.error("Thread creation returned invalid response:", thread);
         return res.sendStatus(500); // Fail gracefully
@@ -49,10 +49,13 @@ app.post("/telegram", async (req, res) => {
     do {
       await new Promise((r) => setTimeout(r, 1000));
       runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
+      console.log(`Run status: ${runStatus.status}`);
     } while (runStatus.status !== "completed");
 
     const messages = await openai.beta.threads.messages.list(threadId);
     const lastMessage = messages.data[0].content[0].text.value;
+
+    console.log(`Sending response to Telegram: ${lastMessage}`);
 
     await axios.post(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
