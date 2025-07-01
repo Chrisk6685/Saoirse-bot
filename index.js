@@ -20,35 +20,50 @@ app.post("/telegram", async (req, res) => {
 
   let threadId = userThreads[chatId];
   if (!threadId) {
-    const thread = await openai.beta.threads.create();
-    threadId = thread.id;
-    userThreads[chatId] = threadId;
+    try {
+      const thread = await openai.beta.threads.create();
+      console.log("Created new thread:", thread);
+      if (!thread || !thread.id) {
+        console.error("Thread creation returned invalid response:", thread);
+        return res.sendStatus(500); // Fail gracefully
+      }
+      threadId = thread.id;
+      userThreads[chatId] = threadId;
+    } catch (error) {
+      console.error("Error creating thread:", error);
+      return res.sendStatus(500); // Fail gracefully
+    }
   }
 
-  await openai.beta.threads.messages.create(threadId, {
-    role: "user",
-    content: userMessage,
-  });
+  try {
+    await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: userMessage,
+    });
 
-  const run = await openai.beta.threads.runs.create(threadId, {
-    assistant_id: "asst_AIb6g1seiMMXOSchyZtydoR3",
-  });
+    const run = await openai.beta.threads.runs.create(threadId, {
+      assistant_id: "asst_AIb6g1seiMMXOSchyZtydoR3",
+    });
 
-  let runStatus;
-  do {
-    await new Promise((r) => setTimeout(r, 1000));
-    runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
-  } while (runStatus.status !== "completed");
+    let runStatus;
+    do {
+      await new Promise((r) => setTimeout(r, 1000));
+      runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
+    } while (runStatus.status !== "completed");
 
-  const messages = await openai.beta.threads.messages.list(threadId);
-  const lastMessage = messages.data[0].content[0].text.value;
+    const messages = await openai.beta.threads.messages.list(threadId);
+    const lastMessage = messages.data[0].content[0].text.value;
 
-  await axios.post(
-    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-    { chat_id: chatId, text: lastMessage }
-  );
+    await axios.post(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      { chat_id: chatId, text: lastMessage }
+    );
 
-  res.sendStatus(200);
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("Error processing message:", error);
+    res.sendStatus(500);
+  }
 });
 
 const PORT = process.env.PORT || 3000;
